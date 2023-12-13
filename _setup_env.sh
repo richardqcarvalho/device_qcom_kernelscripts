@@ -22,10 +22,11 @@
 
 # TODO: Use a $(gettop) style method.
 export ROOT_DIR=$PWD
+export KERNEL_DIR=kernel/xiaomi/taoyao
 
 export BUILD_CONFIG=${BUILD_CONFIG:-build.config}
 set -a
-. ${ROOT_DIR}/${BUILD_CONFIG}
+. ${ROOT_DIR}/${KERNEL_DIR}/${BUILD_CONFIG}
 set +a
 
 export COMMON_OUT_DIR=$(readlink -m ${OUT_DIR:-${ROOT_DIR}/out/${BRANCH}})
@@ -33,8 +34,7 @@ export OUT_DIR=$(readlink -m ${COMMON_OUT_DIR}/${KERNEL_DIR})
 export DIST_DIR=$(readlink -m ${DIST_DIR:-${COMMON_OUT_DIR}/dist})
 
 echo "========================================================"
-echo "= build config: ${ROOT_DIR}/${BUILD_CONFIG}"
-cat ${ROOT_DIR}/${BUILD_CONFIG}
+echo "= build config: ${ROOT_DIR}/${KERNEL_DIR}/${BUILD_CONFIG}"
 
 # List of prebuilt directories shell variables to incorporate into PATH
 PREBUILTS_PATHS=(
@@ -57,10 +57,6 @@ for PREBUILT_BIN in "${PREBUILTS_PATHS[@]}"; do
     fi
 done
 export PATH
-
-echo
-echo "PATH=${PATH}"
-echo
 
 # verifies that defconfig matches the DEFCONFIG
 function check_defconfig() {
