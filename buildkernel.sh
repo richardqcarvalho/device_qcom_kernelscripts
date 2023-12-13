@@ -197,7 +197,7 @@ copy_modules_to_prebuilt()
 
 	# Copy the modules.blocklist file
 	set -x
-	BLOCKLIST_FILE=${PWD}/device/qcom/kernelscripts/modules_blocklist/modules.blocklist.${TARGET_PRODUCT}
+	BLOCKLIST_FILE=${PWD}/kbuilder/modules_blocklist/modules.blocklist.${TARGET_PRODUCT}
 	if [ -f "${BLOCKLIST_FILE}" ]; then
 		cp ${BLOCKLIST_FILE} ${KERNEL_MODULES_OUT}/modules.blocklist
 		sed -i -e '/blocklist/ s/-/_/g' ${KERNEL_MODULES_OUT}/modules.blocklist

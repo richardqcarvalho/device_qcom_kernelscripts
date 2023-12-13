@@ -207,7 +207,7 @@ BOARD_VENDOR_KERNEL_MODULES_$(GKI_TARGET_MODULES_DIR) = \
               $(foreach mod, $(BOARD_VENDOR_KERNEL_MODULES), \
                 $(subst $(KERNEL_MODULES_OUT), $(GKI_KERNEL_MODULES_OUT), $(mod)))
 
-$(warning VENDOR_RAMDISK_KERNEL_MODLUES = $(VENDOR_RAMDISK_KERNEL_MODLUES))
+$(warning VENDOR_RAMDISK_KERNEL_MODULES = $(VENDOR_RAMDISK_KERNEL_MODULES))
 
 ifneq ($(VENDOR_RAMDISK_KERNEL_MODULES),)
 VENDOR_RAMDISK_KERNEL_MODULES_ARCHIVE := vendor_ramdisk_modules.zip
@@ -266,7 +266,7 @@ define build-kernel
 	KERNEL_CONFIG_OVERRIDE_FACTORY=$(KERNEL_CONFIG_OVERRIDE_FACTORY) \
 	TARGET_PRODUCT=$(TARGET_PRODUCT) \
 	TZ=$(TZ) \
-	device/qcom/kernelscripts/buildkernel.sh \
+	kbuilder/buildkernel.sh \
 	$(real_cc) \
 	$(TARGET_KERNEL_MAKE_ENV)
 endef
