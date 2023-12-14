@@ -24,7 +24,7 @@
 
 set -e
 
-export ROOT_DIR=$(readlink -f $(dirname $0)/../../..)
+export ROOT_DIR=$(readlink -f $(dirname $0)/..)
 export MAKE_ARGS=$@
 export COMMON_OUT_DIR=$(readlink -m ${OUT_DIR:-${ROOT_DIR}/out/${BRANCH}})
 export OUT_DIR=$(readlink -m ${COMMON_OUT_DIR})
@@ -34,12 +34,6 @@ export MODULES_PRIVATE_DIR=$(readlink -m ${COMMON_OUT_DIR}/private)
 export DIST_DIR=$(readlink -m ${DIST_DIR:-${COMMON_OUT_DIR}/dist})
 export UNSTRIPPED_DIR=${ROOT_DIR}/${KERNEL_MODULES_OUT}/unstripped
 export CLANG_TRIPLE CROSS_COMPILE CROSS_COMPILE_ARM32 ARCH SUBARCH
-
-if [ -z ${TZ} ]
-then
-    TZ=$(cat /etc/timezone)
-fi
-echo "timezone for kernel: ${TZ}"
 
 #Setting up for build
 PREBUILT_KERNEL_IMAGE=$(basename ${TARGET_PREBUILT_INT_KERNEL})
@@ -64,20 +58,9 @@ make_defconfig()
 		echo "Building defconfig"
 		set -x
 		(cd ${KERNEL_DIR} && \
-		${MAKE_PATH}make TZ=${TZ} O=${OUT_DIR} ${MAKE_ARGS} HOSTCFLAGS="${TARGET_INCLUDES}" HOSTLDFLAGS="${TARGET_LINCLUDES}" ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} ${DEFCONFIG})
+		${MAKE_PATH}make O=${OUT_DIR} ${MAKE_ARGS} HOSTCFLAGS="${TARGET_INCLUDES}" HOSTLDFLAGS="${TARGET_LINCLUDES}" ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} ${DEFCONFIG})
 		set +x
 	fi
-
-	if [ ! -z "${KERNEL_CONFIG_OVERRIDE_FACTORY}"  ]; then
-		echo "Rebuilding defconfig"
-		echo "Overriding kernel config with" ${KERNEL_CONFIG_OVERRIDE_FACTORY};
-		echo ${KERNEL_CONFIG_OVERRIDE_FACTORY} >> ${OUT_DIR}/.config;
-		set -x
-		(cd ${KERNEL_DIR} && \
-		make O=${OUT_DIR} ${MAKE_ARGS} HOSTCFLAGS="${TARGET_INCLUDES}" HOSTLDFLAGS="${TARGET_LINCLUDES}" ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} oldconfig)
-		set +x
-	fi
-
 }
 
 #Install headers
@@ -87,7 +70,7 @@ headers_install()
 	echo "Installing kernel headers"
 	set -x
 	(cd ${OUT_DIR} && \
-	${MAKE_PATH}make TZ=${TZ} HOSTCFLAGS="${TARGET_INCLUDES}" HOSTLDFLAGS="${TARGET_LINCLUDES}" ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} O=${OUT_DIR} ${CC_ARG} ${MAKE_ARGS} headers_install)
+	${MAKE_PATH}make HOSTCFLAGS="${TARGET_INCLUDES}" HOSTLDFLAGS="${TARGET_LINCLUDES}" ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} O=${OUT_DIR} ${CC_ARG} ${MAKE_ARGS} headers_install)
 	set +x
 }
 
@@ -103,7 +86,7 @@ build_kernel()
 		NCORES=8
 	fi
 	(cd ${OUT_DIR} && \
-	${MAKE_PATH}make TZ=${TZ} ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} HOSTCFLAGS="${TARGET_INCLUDES}" HOSTLDFLAGS="${TARGET_LINCLUDES}" O=${OUT_DIR} ${CC_ARG} ${MAKE_ARGS} -j${NCORES})
+	${MAKE_PATH}make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} HOSTCFLAGS="${TARGET_INCLUDES}" HOSTLDFLAGS="${TARGET_LINCLUDES}" O=${OUT_DIR} ${CC_ARG} ${MAKE_ARGS} -j${NCORES})
 	set +x
 }
 
@@ -116,7 +99,7 @@ modules_install()
 	mkdir -p ${MODULES_STAGING_DIR}
 	set -x
 	(cd ${OUT_DIR} && \
-	${MAKE_PATH}make TZ=${TZ} O=${OUT_DIR} ${CC_ARG} INSTALL_MOD_STRIP=1 INSTALL_MOD_PATH=${MODULES_STAGING_DIR} ${MAKE_ARGS} modules_install)
+	${MAKE_PATH}make O=${OUT_DIR} ${CC_ARG} INSTALL_MOD_STRIP=1 INSTALL_MOD_PATH=${MODULES_STAGING_DIR} ${MAKE_ARGS} modules_install)
 	set +x
 }
 
@@ -238,17 +221,13 @@ copy_all_to_prebuilt()
 	fi
 	cp -p ${OUT_DIR}/${IMAGE_FILE_PATH}/${PREBUILT_KERNEL_IMAGE} ${PREBUILT_OUT}/${IMAGE_FILE_PATH}/${PREBUILT_KERNEL_IMAGE}
 
-	#copy dtbo images to prebuilt
+	#copy dtb/dtbo images to prebuilt if they exist
 	echo "============="
 	echo "Copying target dtb/dtbo files to prebuilt"
-	if [ ! -e ${PREBUILT_OUT}/${IMAGE_FILE_PATH}/dts/vendor/qcom ]; then
-		mkdir -p ${PREBUILT_OUT}/${IMAGE_FILE_PATH}/dts/vendor/qcom
-	fi
-	cp -p -r ${OUT_DIR}/${IMAGE_FILE_PATH}/dts/vendor/qcom/*.dtb ${PREBUILT_OUT}/${IMAGE_FILE_PATH}/dts/vendor/qcom/
-
-	if [ -f ${OUT_DIR}/${IMAGE_FILE_PATH}/dts/vendor/qcom/*.dtbo ]; then
-		cp -p -r ${OUT_DIR}/${IMAGE_FILE_PATH}/dts/vendor/qcom/*.dtbo ${PREBUILT_OUT}/${IMAGE_FILE_PATH}/dts/vendor/qcom/
-	fi
+	find "${OUT_DIR}/${IMAGE_FILE_PATH}/dts/vendor/qcom" -type f -name '*.dtb' \
+	-exec cp -p -r -t "${PREBUILT_OUT}/${IMAGE_FILE_PATH}/dts/vendor/qcom" {} \;
+	find "${OUT_DIR}/${IMAGE_FILE_PATH}/dts/vendor/qcom" -type f -name '*.dtbo' \
+	-exec cp -p -r -t "${PREBUILT_OUT}/${IMAGE_FILE_PATH}/dts/vendor/qcom" {} \;
 
 	#copy arch generated headers
 	echo "============="
@@ -317,8 +296,10 @@ copy_from_prebuilt()
 	if [ ! -e ${OUT_DIR}/${IMAGE_FILE_PATH}/dts/vendor/qcom ]; then
 		mkdir -p ${OUT_DIR}/${IMAGE_FILE_PATH}/dts/vendor/qcom
 	fi
-	cp -p -r ${PREBUILT_OUT}/${IMAGE_FILE_PATH}/dts/vendor/qcom/*.dtb ${OUT_DIR}/${IMAGE_FILE_PATH}/dts/vendor/qcom/
-	cp -p -r ${PREBUILT_OUT}/${IMAGE_FILE_PATH}/dts/vendor/qcom/*.dtbo ${OUT_DIR}/${IMAGE_FILE_PATH}/dts/vendor/qcom/
+	find ${PREBUILT_OUT}/${IMAGE_FILE_PATH}/dts/vendor/qcom/ -type f -name "*.dtb" \
+	-exec cp -p -r -t "${OUT_DIR}/${IMAGE_FILE_PATH}/dts/vendor/qcom" {} \;
+	find ${PREBUILT_OUT}/${IMAGE_FILE_PATH}/dts/vendor/qcom/ -type f -name "*.dtbo" \
+	-exec cp -p -r -t "${OUT_DIR}/${IMAGE_FILE_PATH}/dts/vendor/qcom" {} \;
 
 	#copy arch generated headers, and kernel generated headers
 	echo "============"
@@ -364,7 +345,7 @@ save_unstripped_modules()
 	set -x
 
 	(cd ${OUT_DIR} && \
-	${MAKE_PATH}make TZ=${TZ} O=${OUT_DIR} ${CC_ARG} INSTALL_MOD_PATH=${UNSTRIPPED_DIR} ${MAKE_ARGS} modules_install)
+	${MAKE_PATH}make O=${OUT_DIR} ${CC_ARG} INSTALL_MOD_PATH=${UNSTRIPPED_DIR} ${MAKE_ARGS} modules_install)
 
 	MODULES=$(find ${UNSTRIPPED_DIR} -type f -name "*.ko")
 	for MODULE in ${MODULES}; do

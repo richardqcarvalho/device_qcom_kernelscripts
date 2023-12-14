@@ -1,11 +1,7 @@
 # Android Kernel compilation/common definitions
 
 ifeq ($(KERNEL_DEFCONFIG),)
-ifneq ($(TARGET_BOARD_AUTO),true)
-     KERNEL_DEFCONFIG := vendor/$(TARGET_PRODUCT)-qgki-debug_defconfig
-else
-     KERNEL_DEFCONFIG := vendor/gen3auto-qgki-debug_defconfig
-endif
+KERNEL_DEFCONFIG := vendor/taoyao-qgki-debug_defconfig
 endif
 
 TARGET_KERNEL := msm-$(TARGET_KERNEL_VERSION)
@@ -23,6 +19,11 @@ TARGET_KERNEL_MAKE_ENV += CONFIG_BUILD_ARM64_DT_OVERLAY=y
 TARGET_KERNEL_MAKE_ENV += HOSTCC=$(SOURCE_ROOT)/$(SOONG_LLVM_PREBUILTS_PATH)/clang
 TARGET_KERNEL_MAKE_ENV += HOSTAR=$(SOURCE_ROOT)/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8/bin/x86_64-linux-ar
 TARGET_KERNEL_MAKE_ENV += HOSTLD=$(SOURCE_ROOT)/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8/bin/x86_64-linux-ld
+# Pass M4, LEX, and YACC via TARGET_KERNEL_MAKE_ENV to prevent build errors due
+# to android build system's restriction against using path tools.
+TARGET_KERNEL_MAKE_ENV += M4=$(SOURCE_ROOT)/prebuilts/build-tools/linux-x86/bin/m4
+TARGET_KERNEL_MAKE_ENV += LEX=$(SOURCE_ROOT)/prebuilts/build-tools/linux-x86/bin/flex
+TARGET_KERNEL_MAKE_ENV += YACC=$(SOURCE_ROOT)/prebuilts/build-tools/linux-x86/bin/bison
 TARGET_KERNEL_MAKE_CFLAGS = "-I$(SOURCE_ROOT)/$(TARGET_KERNEL_SOURCE)/include/uapi -I/usr/include -I/usr/include/x86_64-linux-gnu -I$(SOURCE_ROOT)/$(TARGET_KERNEL_SOURCE)/include -L/usr/lib -L/usr/lib/x86_64-linux-gnu -fuse-ld=lld"
 TARGET_KERNEL_MAKE_LDFLAGS = "-L/usr/lib -L/usr/lib/x86_64-linux-gnu -fuse-ld=lld"
 
@@ -61,15 +62,15 @@ KERNEL_CONFIG_OVERRIDE := CONFIG_ANDROID_BINDER_IPC_32BIT=y
 endif
 endif
 
-ifeq ($(FACTORY_BUILD),1)
-KERNEL_CONFIG_OVERRIDE_FACTORY := CONFIG_FACTORY_BUILD=y
-endif
-
 TARGET_KERNEL_CROSS_COMPILE_PREFIX := $(strip $(TARGET_KERNEL_CROSS_COMPILE_PREFIX))
 ifeq ($(TARGET_KERNEL_CROSS_COMPILE_PREFIX),)
 KERNEL_CROSS_COMPILE := arm-eabi-
 else
+ifeq ($(KERNEL_ARCH), arm64)
 KERNEL_CROSS_COMPILE := $(shell pwd)/$(TARGET_TOOLS_PREFIX)
+else
+KERNEL_CROSS_COMPILE := $(TARGET_KERNEL_CROSS_COMPILE_PREFIX)
+endif
 endif
 
 ifeq ($(TARGET_PREBUILT_KERNEL),)
@@ -109,11 +110,10 @@ KERNEL_CFLAGS := KCFLAGS=-mno-android
 endif
 endif
 
-GKI_KERNEL=0
 ifneq (,$(findstring gki,$(KERNEL_DEFCONFIG)))
 $(info ###### GKI based platform ######)
 ifneq "gki_defconfig" "$(KERNEL_DEFCONFIG)"
-GKI_KERNEL=1
+GKI_KERNEL ?= 1
 endif
 endif
 
@@ -125,6 +125,11 @@ KERNEL_USR_TS := $(TARGET_OUT_INTERMEDIATES)/kernelusr.time
 
 KERNEL_CONFIG := $(KERNEL_OUT)/.config
 
+# Move MAKE_PATH here (cut from below), so that it's defined before first use.
+# Without this the build fails due to android build system path tool
+# restrictions.
+MAKE_PATH := $(SOURCE_ROOT)/prebuilts/build-tools/linux-x86/bin/
+
 ifeq ($(KERNEL_DEFCONFIG)$(wildcard $(KERNEL_CONFIG)),)
 $(error Kernel configuration not defined, cannot build kernel)
 else
@@ -135,7 +140,7 @@ GKI_PLATFORM_NAME := $(shell echo $(GKI_PLATFORM_NAME) | sed "s/vendor\///g")
 TARGET_USES_UNCOMPRESSED_KERNEL := $(shell grep "CONFIG_BUILD_ARM64_UNCOMPRESSED_KERNEL=y" $(TARGET_KERNEL_SOURCE)/arch/arm64/configs/vendor/$(GKI_PLATFORM_NAME)_GKI.config)
 
 else
-TARGET_USES_UNCOMPRESSED_KERNEL := $(shell grep "CONFIG_BUILD_ARM64_UNCOMPRESSED_KERNEL=y" $(TARGET_KERNEL_SOURCE)/arch/$(KERNEL_ARCH)/configs/$(KERNEL_DEFCONFIG))
+TARGET_USES_UNCOMPRESSED_KERNEL ?= $(shell grep "CONFIG_BUILD_ARM64_UNCOMPRESSED_KERNEL=y" $(TARGET_KERNEL_SOURCE)/arch/$(KERNEL_ARCH)/configs/$(KERNEL_DEFCONFIG))
 endif
 
 # Generate the defconfig file from the fragments
@@ -169,14 +174,13 @@ endif
 # If the configuration is QGKI, build the GKI kernel as well
 # The build system overrides INSTALLED_KERNEL_TARGET if BOARD_KERNEL_BINARIES is defined
 ifeq ($(GKI_KERNEL),1)
-  ifeq "$(KERNEL_DEFCONFIG)" "vendor/$(TARGET_PRODUCT)-qgki_defconfig"
+  ifeq "$(KERNEL_DEFCONFIG)" "vendor/taoyao-qgki_defconfig"
     $(info Additional GKI images will be built)
-    BOARD_KERNEL_BINARIES := kernel kernel-gki
     INSTALLED_KERNEL_TARGET := $(foreach k,$(BOARD_KERNEL_BINARIES), $(PRODUCT_OUT)/$(k))
 
     # Create new definitions for building an additional GKI kernel on the side
     GKI_INSTALLED_KERNEL_TARGET := $(PRODUCT_OUT)/kernel-gki
-    GKI_KERNEL_DEFCONFIG := vendor/$(TARGET_PRODUCT)-gki_defconfig
+    GKI_KERNEL_DEFCONFIG := vendor/taoyao-gki_defconfig
     GKI_KERNEL_OUT := $(TARGET_OUT_INTERMEDIATES)/kernel-gki/$(TARGET_KERNEL)
     GKI_KERNEL_MODULES_OUT := $(PRODUCT_OUT)/$(KERNEL_MODULES_INSTALL)/lib/modules/gki
     GKI_KERNEL_HEADERS_INSTALL := $(GKI_KERNEL_OUT)/usr
@@ -188,7 +192,7 @@ ifeq ($(GKI_KERNEL),1)
     BOARD_KERNEL-GKI_BOOTIMAGE_PARTITION_SIZE := 0x06000000
 
     # Generate the GKI defconfig
-    _x := $(shell ARCH=$(KERNEL_ARCH) CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) $(real_cc) KERN_OUT=$(KERNEL_OUT) $(TARGET_KERNEL_MAKE_ENV) MAKE_PATH=$(MAKE_PATH) $(TARGET_KERNEL_SOURCE)/scripts/gki/generate_defconfig.sh $(GKI_KERNEL_DEFCONFIG))
+    _x := $(shell ARCH=$(KERNEL_ARCH) CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) $(real_cc) KERN_OUT=$(KERNEL_OUT) $(TARGET_KERNEL_MAKE_ENV) MAKE_PATH=$(MAKE_PATH) TARGET_BUILD_VARIANT=${TARGET_BUILD_VARIANT} $(TARGET_KERNEL_SOURCE)/scripts/gki/generate_defconfig.sh $(GKI_KERNEL_DEFCONFIG))
   endif
 endif
 
@@ -212,7 +216,7 @@ $(warning VENDOR_RAMDISK_KERNEL_MODULES = $(VENDOR_RAMDISK_KERNEL_MODULES))
 ifneq ($(VENDOR_RAMDISK_KERNEL_MODULES),)
 VENDOR_RAMDISK_KERNEL_MODULES_ARCHIVE := vendor_ramdisk_modules.zip
 
-ifeq "$(KERNEL_DEFCONFIG)" "vendor/$(TARGET_PRODUCT)-gki_defconfig"
+ifeq "$(KERNEL_DEFCONFIG)" "vendor/taoyao-gki_defconfig"
 BOARD_VENDOR_RAMDISK_KERNEL_MODULES_ARCHIVE := $(KERNEL_MODULES_OUT)/$(VENDOR_RAMDISK_KERNEL_MODULES_ARCHIVE)
 $(BOARD_VENDOR_RAMDISK_KERNEL_MODULES_ARCHIVE): $(TARGET_PREBUILT_KERNEL)
 endif
@@ -235,8 +239,6 @@ $(BOARD_VENDOR_RAMDISK_KERNEL_MODULES): $(TARGET_PREBUILT_KERNEL)
 ifdef RTIC_MPGEN
 RTIC_DTB := $(KERNEL_SYMLINK)/rtic_mp.dtb
 endif
-
-MAKE_PATH := $(SOURCE_ROOT)/prebuilts/build-tools/linux-x86/bin/
 
 # Helper functions
 
@@ -263,10 +265,7 @@ define build-kernel
 	VENDOR_KERNEL_MODULES_ARCHIVE=$(VENDOR_KERNEL_MODULES_ARCHIVE) \
 	VENDOR_RAMDISK_KERNEL_MODULES_ARCHIVE=$(VENDOR_RAMDISK_KERNEL_MODULES_ARCHIVE) \
 	VENDOR_RAMDISK_KERNEL_MODULES="$(VENDOR_RAMDISK_KERNEL_MODULES)" \
-	KERNEL_CONFIG_OVERRIDE_FACTORY=$(KERNEL_CONFIG_OVERRIDE_FACTORY) \
-	TARGET_PRODUCT=$(TARGET_PRODUCT) \
-	TZ=$(TZ) \
-	kbuilder/buildkernel.sh \
+	TARGET_PRODUCT=taoyao \
 	$(real_cc) \
 	$(TARGET_KERNEL_MAKE_ENV)
 endef
@@ -294,8 +293,6 @@ $(KERNEL_USR): | $(KERNEL_HEADERS_INSTALL)
 
 $(TARGET_PREBUILT_KERNEL): $(KERNEL_OUT) $(DTC) $(KERNEL_USR)
 	echo "Building the requested kernel.."; \
-	KERNEL_CONFIG_OVERRIDE_FACTORY=$(KERNEL_CONFIG_OVERRIDE_FACTORY) \
-	TARGET_PRODUCT=$(TARGET_PRODUCT) \
 	$(call build-kernel,$(KERNEL_DEFCONFIG),$(KERNEL_OUT),$(KERNEL_MODULES_OUT),$(KERNEL_HEADERS_INSTALL),0,$(TARGET_PREBUILT_INT_KERNEL))
 
 $(GKI_TARGET_PREBUILT_KERNEL): $(DTC) $(UFDT_APPLY_OVERLAY) $(GKI_KERNEL_OUT)
@@ -315,7 +312,20 @@ $(RTIC_DTB): $(INSTALLED_KERNEL_TARGET)
 	stat $(KERNEL_SYMLINK)/rtic_mp.dts 2>/dev/null >&2 && \
 	$(DTC) -O dtb -o $(RTIC_DTB) -b 1 $(DTC_FLAGS) $(KERNEL_SYMLINK)/rtic_mp.dts || \
 	touch $(RTIC_DTB)
-
+P_NAME="$(TARGET_BOARD_SUFFIX)"
+VENDOR_DTB_OBJECTS ?= arch/$(KERNEL_ARCH)/boot/dts/vendor/qcom/*.dtb
+ifeq ($(P_NAME),"_gvmgh")
 # Creating a dtb.img once the kernel is compiled if TARGET_KERNEL_APPEND_DTB is set to be false
 $(INSTALLED_DTBIMAGE_TARGET): $(INSTALLED_KERNEL_TARGET) $(RTIC_DTB)
-	cat $(KERNEL_OUT)/arch/$(KERNEL_ARCH)/boot/dts/vendor/qcom/*.dtb $(RTIC_DTB) > $@
+	cat $(KERNEL_OUT)/$(VENDOR_DTB_OBJECTS) $(RTIC_DTB) > $@ \
+	$(shell device/qcom/msmnile_gvmgh/generate_linux_image.sh $(KERNEL_OUT)/arch/arm64/boot/Image) \
+
+else
+# Creating a dtb.img once the kernel is compiled if TARGET_KERNEL_APPEND_DTB is set to be false
+$(INSTALLED_DTBIMAGE_TARGET): $(INSTALLED_KERNEL_TARGET) $(RTIC_DTB)
+	cat $(KERNEL_OUT)/$(VENDOR_DTB_OBJECTS) $(RTIC_DTB) > $@
+endif
+
+ifeq ($(TARGET_DUMMY_VENDOR_BOOT), true)
+	$(shell dd if=/dev/zero of=$(PRODUCT_OUT)/vendor_boot.img bs=1M count=96)
+endif
