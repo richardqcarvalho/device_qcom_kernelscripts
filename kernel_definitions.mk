@@ -260,7 +260,7 @@ define build-kernel
 	VENDOR_RAMDISK_KERNEL_MODULES_ARCHIVE=$(VENDOR_RAMDISK_KERNEL_MODULES_ARCHIVE) \
 	VENDOR_RAMDISK_KERNEL_MODULES="$(VENDOR_RAMDISK_KERNEL_MODULES)" \
 	TARGET_PRODUCT=taoyao \
-	kbuilder/buildkernel.sh \
+	kernel/xiaomi/taoyao/build/buildkernel.sh \
 	$(real_cc) \
 	$(TARGET_KERNEL_MAKE_ENV)
 endef

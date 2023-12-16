@@ -180,7 +180,7 @@ copy_modules_to_prebuilt()
 
 	# Copy the modules.blocklist file
 	set -x
-	BLOCKLIST_FILE=${PWD}/kbuilder/modules.blocklist
+	BLOCKLIST_FILE=${PWD}/kernel/xiaomi/taoyao/build/modules.blocklist
 	if [ -f "${BLOCKLIST_FILE}" ]; then
 		cp ${BLOCKLIST_FILE} ${KERNEL_MODULES_OUT}/modules.blocklist
 		sed -i -e '/blocklist/ s/-/_/g' ${KERNEL_MODULES_OUT}/modules.blocklist
