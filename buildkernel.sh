@@ -24,7 +24,7 @@
 
 set -e
 
-export ROOT_DIR=$(readlink -f $(dirname $0)/..)
+export ROOT_DIR=$(readlink -f $(dirname $0)/../../../..)
 export MAKE_ARGS=$@
 export COMMON_OUT_DIR=$(readlink -m ${OUT_DIR:-${ROOT_DIR}/out/${BRANCH}})
 export OUT_DIR=$(readlink -m ${COMMON_OUT_DIR})
