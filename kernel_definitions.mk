@@ -5,48 +5,29 @@ KERNEL_DEFCONFIG := vendor/taoyao-qgki-debug_defconfig
 endif
 
 SOURCE_ROOT := $(shell pwd)
-DTC := $(SOURCE_ROOT)/old/prebuilts/kernel-build-tools/linux-x86/bin/dtc
-UFDT_APPLY_OVERLAY := $(SOURCE_ROOT)/old/prebuilts/kernel-build-tools/linux-x86/bin/ufdt_apply_overlay
-TARGET_KERNEL_MAKE_ENV := \
-	AR=$(SOURCE_ROOT)/old/prebuilts/clang/host/linux-x86/clang-r399163/bin/llvm-ar \
-	AS=$(SOURCE_ROOT)/old/prebuilts/clang/host/linux-x86/clang-r399163/bin/llvm-as \
-	AWK=$(SOURCE_ROOT)/old/prebuilts/build-tools/path/linux-x86/awk \
-	CC=$(SOURCE_ROOT)/old/prebuilts/clang/host/linux-x86/clang-r399163/bin/clang \
-	CONFIG_BUILD_ARM64_DT_OVERLAY=y \
-	CLANG_TRIPLE=aarch64-linux-gnu- \
-	CROSS_COMPILE=$(SOURCE_ROOT)/old/prebuilts/clang/host/linux-x86/clang-r399163/bin/llvm- \
-	DEPMOD=$(SOURCE_ROOT)/old/prebuilts/kernel-build-tools/linux-x86/bin/depmod \
-	DTC=$(DTC) \
-	DTC_EXT=$(DTC) \
-	DTC_OVERLAY_TEST_EXT=$(UFDT_APPLY_OVERLAY) \
-	HOSTAR=$(SOURCE_ROOT)/old/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8/bin/x86_64-linux-ar \
-	HOSTCC=$(SOURCE_ROOT)/old/prebuilts/clang/host/linux-x86/clang-r399163/bin/clang \
-	HOSTCXX=$(SOURCE_ROOT)/old/prebuilts/clang/host/linux-x86/clang-r399163/bin/clang++ \
-	HOSTLD=$(SOURCE_ROOT)/old/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8/bin/x86_64-linux-ld \
-	KBZIP2=$(SOURCE_ROOT)/old/prebuilts/build-tools/path/linux-x86/bzip2 \
-	KGZIP=$(SOURCE_ROOT)/old/prebuilts/build-tools/path/linux-x86/gzip \
-	LD=$(SOURCE_ROOT)/old/prebuilts/clang/host/linux-x86/clang-r399163/bin/ld.lld \
-	LEX=$(SOURCE_ROOT)/old/prebuilts/build-tools/linux-x86/bin/flex \
-	LLVM_NM=$(SOURCE_ROOT)/old/prebuilts/clang/host/linux-x86/clang-r399163/bin/llvm-nm \
-	LZ4=$(SOURCE_ROOT)/old/prebuilts/kernel-build-tools/linux-x86/bin/lz4 \
-	M4=$(SOURCE_ROOT)/old/prebuilts/build-tools/linux-x86/bin/m4 \
-	MAKE_PATH=$(SOURCE_ROOT)/old/prebuilts/build-tools/linux-x86/bin/ \
-	NM=$(SOURCE_ROOT)/old/prebuilts/clang/host/linux-x86/clang-r399163/bin/llvm-nm \
-	OBJCOPY=$(SOURCE_ROOT)/old/prebuilts/clang/host/linux-x86/clang-r399163/bin/llvm-objcopy \
-	OBJDUMP=$(SOURCE_ROOT)/old/prebuilts/clang/host/linux-x86/clang-r399163/bin/llvm-objdump \
-	OBJSIZE=$(SOURCE_ROOT)/old/prebuilts/clang/host/linux-x86/clang-r399163/bin/llvm-size \
-	PAHOLE=$(SOURCE_ROOT)/old/prebuilts/kernel-build-tools/linux-x86/bin/pahole \
-	PYTHON=$(SOURCE_ROOT)/old/prebuilts/build-tools/path/linux-x86/python \
-	PYTHON3=$(SOURCE_ROOT)/old/prebuilts/build-tools/path/linux-x86/python3 \
-	READELF=$(SOURCE_ROOT)/old/prebuilts/clang/host/linux-x86/clang-r399163/bin/llvm-readelf \
-	REAL_CC=$(SOURCE_ROOT)/old/prebuilts/clang/host/linux-x86/clang-r399163/bin/clang \
-	STRIP=$(SOURCE_ROOT)/old/prebuilts/clang/host/linux-x86/clang-r399163/bin/llvm-strip \
-	XZ=$(SOURCE_ROOT)/old/prebuilts/build-tools/path/linux-x86/xz \
-	YACC=$(SOURCE_ROOT)/old/prebuilts/build-tools/linux-x86/bin/bison
+DTC := $(HOST_OUT_EXECUTABLES)/dtc$(HOST_EXECUTABLE_SUFFIX)
+UFDT_APPLY_OVERLAY := $(HOST_OUT_EXECUTABLES)/ufdt_apply_overlay$(HOST_EXECUTABLE_SUFFIX)
+TARGET_KERNEL_MAKE_ENV := DTC_EXT=$(SOURCE_ROOT)/$(DTC)
+TARGET_KERNEL_MAKE_ENV += DTC_OVERLAY_TEST_EXT=$(SOURCE_ROOT)/$(UFDT_APPLY_OVERLAY)
+TARGET_KERNEL_MAKE_ENV += CONFIG_BUILD_ARM64_DT_OVERLAY=y
+TARGET_KERNEL_MAKE_ENV += HOSTCC=$(SOURCE_ROOT)/$(SOONG_LLVM_PREBUILTS_PATH)/clang
+TARGET_KERNEL_MAKE_ENV += HOSTAR=$(SOURCE_ROOT)/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8/bin/x86_64-linux-ar
+TARGET_KERNEL_MAKE_ENV += HOSTLD=$(SOURCE_ROOT)/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8/bin/x86_64-linux-ld
+# Pass M4, LEX, and YACC via TARGET_KERNEL_MAKE_ENV to prevent build errors due
+# to android build system's restriction against using path tools.
+TARGET_KERNEL_MAKE_ENV += M4=$(SOURCE_ROOT)/prebuilts/build-tools/linux-x86/bin/m4
+TARGET_KERNEL_MAKE_ENV += LEX=$(SOURCE_ROOT)/prebuilts/build-tools/linux-x86/bin/flex
+TARGET_KERNEL_MAKE_ENV += YACC=$(SOURCE_ROOT)/prebuilts/build-tools/linux-x86/bin/bison
 TARGET_KERNEL_MAKE_CFLAGS = "-I$(SOURCE_ROOT)/$(TARGET_KERNEL_SOURCE)/include/uapi -I/usr/include -I/usr/include/x86_64-linux-gnu -I$(SOURCE_ROOT)/$(TARGET_KERNEL_SOURCE)/include -L/usr/lib -L/usr/lib/x86_64-linux-gnu -fuse-ld=lld"
 TARGET_KERNEL_MAKE_LDFLAGS = "-L/usr/lib -L/usr/lib/x86_64-linux-gnu -fuse-ld=lld"
 
 TARGET_KERNEL := $(TARGET_KERNEL_VERSION)
+CLANG_VERSION := clang-$(TARGET_KERNEL_CLANG_VERSION)
+KERNEL_LLVM_BIN := $(lastword $(sort $(wildcard $(SOURCE_ROOT)/$(LLVM_PREBUILTS_BASE)/$(BUILD_OS)-x86/clang-4*)))/bin/clang
+KERNEL_AOSP_LLVM_BIN := $(SOURCE_ROOT)/$(LLVM_PREBUILTS_BASE)/$(BUILD_OS)-x86/$(CLANG_VERSION)/bin
+KERNEL_AOSP_LLVM_CLANG := $(KERNEL_AOSP_LLVM_BIN)/clang
+USE_KERNEL_AOSP_LLVM := $(shell test -f "$(KERNEL_AOSP_LLVM_CLANG)" && echo "true" || echo "false")
+
 KERNEL_TARGET := $(strip $(INSTALLED_KERNEL_TARGET))
 ifeq ($(KERNEL_TARGET),)
 INSTALLED_KERNEL_TARGET := $(PRODUCT_OUT)/kernel
@@ -79,7 +60,11 @@ TARGET_KERNEL_CROSS_COMPILE_PREFIX := $(strip $(TARGET_KERNEL_CROSS_COMPILE_PREF
 ifeq ($(TARGET_KERNEL_CROSS_COMPILE_PREFIX),)
 KERNEL_CROSS_COMPILE := arm-eabi-
 else
+ifeq ($(KERNEL_ARCH), arm64)
+KERNEL_CROSS_COMPILE := $(shell pwd)/$(TARGET_TOOLS_PREFIX)
+else
 KERNEL_CROSS_COMPILE := $(TARGET_KERNEL_CROSS_COMPILE_PREFIX)
+endif
 endif
 
 ifeq ($(TARGET_PREBUILT_KERNEL),)
@@ -92,7 +77,28 @@ else
 CLANG_ARCH := arm-linux-gnueabi
 endif
 
-ifeq ($(KERNEL_LLVM_SUPPORT),false)
+real_cc :=
+ifeq ($(KERNEL_LLVM_SUPPORT),true)
+  ifeq ($(KERNEL_SD_LLVM_SUPPORT), true)  #Using sd-llvm compiler
+    ifeq ($(shell echo $(SDCLANG_PATH) | head -c 1),/)
+       KERNEL_LLVM_BIN := $(SDCLANG_PATH)/clang
+    else
+       KERNEL_LLVM_BIN := $(shell pwd)/$(SDCLANG_PATH)/clang
+    endif
+    $(warning "Using sdllvm" $(KERNEL_LLVM_BIN))
+  real_cc := REAL_CC=$(KERNEL_LLVM_BIN) CLANG_TRIPLE=aarch64-linux-gnu-
+  else
+    ifeq ($(USE_KERNEL_AOSP_LLVM), true)  #Using kernel aosp-llvm compiler
+       KERNEL_LLVM_BIN := $(KERNEL_AOSP_LLVM_CLANG)
+       $(warning "Using latest kernel aosp llvm" $(KERNEL_LLVM_BIN))
+    else #Using platform aosp-llvm binaries
+       KERNEL_LLVM_BIN := $(shell pwd)/$(CLANG)
+       KERNEL_AOSP_LLVM_BIN := $(shell pwd)/$(shell (dirname $(CLANG)))
+       $(warning "Not using latest aosp-llvm" $(KERNEL_LLVM_BIN))
+    endif
+  real_cc := REAL_CC=$(KERNEL_LLVM_BIN) CLANG_TRIPLE=$(CLANG_ARCH) AR=$(KERNEL_AOSP_LLVM_BIN)/llvm-ar LLVM_NM=$(KERNEL_AOSP_LLVM_BIN)/llvm-nm LD=$(KERNEL_AOSP_LLVM_BIN)/ld.lld NM=$(KERNEL_AOSP_LLVM_BIN)/llvm-nm
+  endif
+else
 ifeq ($(strip $(KERNEL_GCC_NOANDROID_CHK)),0)
 KERNEL_CFLAGS := KCFLAGS=-mno-android
 endif
@@ -113,6 +119,11 @@ KERNEL_USR_TS := $(TARGET_OUT_INTERMEDIATES)/kernelusr.time
 
 KERNEL_CONFIG := $(KERNEL_OUT)/.config
 
+# Move MAKE_PATH here (cut from below), so that it's defined before first use.
+# Without this the build fails due to android build system path tool
+# restrictions.
+MAKE_PATH := $(SOURCE_ROOT)/prebuilts/build-tools/linux-x86/bin/
+
 ifeq ($(KERNEL_DEFCONFIG)$(wildcard $(KERNEL_CONFIG)),)
 $(error Kernel configuration not defined, cannot build kernel)
 else
@@ -127,7 +138,7 @@ TARGET_USES_UNCOMPRESSED_KERNEL ?= $(shell grep "CONFIG_BUILD_ARM64_UNCOMPRESSED
 endif
 
 # Generate the defconfig file from the fragments
-_x := $(shell ARCH=$(KERNEL_ARCH) KERN_OUT=$(KERNEL_OUT) $(TARGET_KERNEL_MAKE_ENV) TARGET_BUILD_VARIANT=${TARGET_BUILD_VARIANT} $(TARGET_KERNEL_SOURCE)/scripts/gki/generate_defconfig.sh $(KERNEL_DEFCONFIG))
+_x := $(shell ARCH=$(KERNEL_ARCH) CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) $(real_cc) KERN_OUT=$(KERNEL_OUT) $(TARGET_KERNEL_MAKE_ENV) MAKE_PATH=$(MAKE_PATH) TARGET_BUILD_VARIANT=${TARGET_BUILD_VARIANT} $(TARGET_KERNEL_SOURCE)/scripts/gki/generate_defconfig.sh $(KERNEL_DEFCONFIG))
 
 ifeq ($(TARGET_USES_UNCOMPRESSED_KERNEL),)
 ifeq ($(KERNEL_ARCH),arm64)
@@ -175,7 +186,7 @@ ifeq ($(GKI_KERNEL),1)
     BOARD_KERNEL-GKI_BOOTIMAGE_PARTITION_SIZE := 0x06000000
 
     # Generate the GKI defconfig
-    _x := $(shell ARCH=$(KERNEL_ARCH) KERN_OUT=$(KERNEL_OUT) $(TARGET_KERNEL_MAKE_ENV) TARGET_BUILD_VARIANT=${TARGET_BUILD_VARIANT} $(TARGET_KERNEL_SOURCE)/scripts/gki/generate_defconfig.sh $(GKI_KERNEL_DEFCONFIG))
+    _x := $(shell ARCH=$(KERNEL_ARCH) CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) $(real_cc) KERN_OUT=$(KERNEL_OUT) $(TARGET_KERNEL_MAKE_ENV) MAKE_PATH=$(MAKE_PATH) TARGET_BUILD_VARIANT=${TARGET_BUILD_VARIANT} $(TARGET_KERNEL_SOURCE)/scripts/gki/generate_defconfig.sh $(GKI_KERNEL_DEFCONFIG))
   endif
 endif
 
@@ -236,7 +247,9 @@ define build-kernel
 	KERNEL_DIR=$(TARGET_KERNEL_SOURCE) \
 	DEFCONFIG=$(1) \
 	OUT_DIR=$(2) \
+	MAKE_PATH=$(MAKE_PATH)\
 	ARCH=$(KERNEL_ARCH) \
+	CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) \
 	KERNEL_MODULES_OUT=$(3) \
 	KERNEL_HEADERS_INSTALL=$(4) \
 	HEADERS_INSTALL=$(5) \
@@ -247,8 +260,9 @@ define build-kernel
 	VENDOR_RAMDISK_KERNEL_MODULES_ARCHIVE=$(VENDOR_RAMDISK_KERNEL_MODULES_ARCHIVE) \
 	VENDOR_RAMDISK_KERNEL_MODULES="$(VENDOR_RAMDISK_KERNEL_MODULES)" \
 	TARGET_PRODUCT=taoyao \
-	$(TARGET_KERNEL_MAKE_ENV) \
-	kbuilder/buildkernel.sh
+	kbuilder/buildkernel.sh \
+	$(real_cc) \
+	$(TARGET_KERNEL_MAKE_ENV)
 endef
 
 # Android Kernel make rules
